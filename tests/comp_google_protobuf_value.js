@@ -20,7 +20,7 @@ var root = protobuf.Root.fromJSON({
 var Value = root.lookupType("protobuf.Value"),
     Foo = root.lookupType(".Foo");
 
-tape.test.only("google.protobuf.Value", function(test) {
+tape.test("google.protobuf.Value", function(test) {
     // null
     var foo = Foo.fromObject({foo: null});
     test.ok(foo.foo instanceof Value.ctor, "foo should be Value");
