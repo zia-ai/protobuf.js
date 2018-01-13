@@ -174,20 +174,19 @@ wrappers[".google.protobuf.Struct"] = {
 
 wrappers[".google.protobuf.Timestamp"] = {
     
-    // given a protobuf Timestamp object, return a plain JS object
-    fromObject: function(object) {
-        return new Date(object.seconds*1000 + object.nanos/1000);
-    },
-
-    
     // given a plain javascript object, return a protobuf Timestamp object
+    fromObject: function(object) {
+
+        return this.create({
+            seconds: Math.floor(object.valueOf()/1000),
+            nanos: (object.valueOf() % 1000) * 1000
+        })
+    },
+    
+    
+    // given a protobuf Timestamp object, return a plain JS object
     toObject: function(message, options) {
         var Timestamp = this.lookup("google.protobuf.Timestamp");
-        
-        return {
-
-            seconds: Math.floor(message.valueOf()/1000),
-            nanos: (message.valueOf() % 1000) * 1000
-        };
+        return new Date(message.seconds*1000 + message.nanos/1000);
     }
 }
