@@ -32,10 +32,14 @@ function genValuePartial_fromObject(gen, field, fieldIndex, prop) {
                     ("break");
             } gen
             ("}");
+        } else if (field.resolvedType.fullName === '.google.protobuf.Value') {
+            // .google.protobuf.Value can render multiple types
+            gen
+            ("m%s=types[%i].fromObject(d%s)", prop, fieldIndex, prop);
         } else {
             gen
-            // ("if(typeof d%s!==\"object\")", prop)
-            //     ("throw TypeError(%j)", field.fullName + ": object expected")
+            ("if(typeof d%s!==\"object\")", prop)
+                ("throw TypeError(%j)", field.fullName + ": object expected")
             ("m%s=types[%i].fromObject(d%s)", prop, fieldIndex, prop);
         }
     } else {
@@ -134,11 +138,12 @@ converter.fromObject = function fromObject(mtype) {
 
         // Non-repeated fields
         } else {
-            if (!(field.resolvedType instanceof Enum)) gen // no need to test for null/undefined if an enum (uses switch)
-    // ("if(d%s!=null){", prop); // !== undefined && !== null
+            var needsGuard = !(field.resolvedType instanceof Enum || (field.resolvedType && field.resolvedType.fullName === '.google.protobuf.Value'));
+            if (needsGuard) gen // no need to test for null/undefined if an enum (uses switch)
+    ("if(d%s!=null){", prop); // !== undefined && !== null
     genValuePartial_fromObject(gen, field, /* not sorted */ i, prop);
-        // if (!(field.resolvedType instanceof Enum)) gen
-    // ("}");
+    if (needsGuard) gen
+    ("}");
         }
     } return gen
     ("return m");

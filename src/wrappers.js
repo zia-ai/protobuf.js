@@ -186,7 +186,7 @@ wrappers[".google.protobuf.Timestamp"] = {
     
     // given a protobuf Timestamp object, return a plain JS object
     toObject: function(message, options) {
-        var Timestamp = this.lookup("google.protobuf.Timestamp");
+
         return new Date(message.seconds*1000 + message.nanos/1000);
     }
 }
