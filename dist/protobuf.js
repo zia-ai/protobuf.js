@@ -1,6 +1,6 @@
 /*!
  * protobuf.js v6.8.3 (c) 2016, daniel wirtz
- * compiled fri, 12 jan 2018 22:40:48 utc
+ * compiled tue, 06 feb 2018 14:32:57 utc
  * licensed under the bsd-3-clause license
  * see: https://github.com/dcodeio/protobuf.js for details
  */
@@ -1521,10 +1521,14 @@ function genValuePartial_fromObject(gen, field, fieldIndex, prop) {
                     ("break");
             } gen
             ("}");
+        } else if (field.resolvedType.fullName === '.google.protobuf.Value') {
+            // .google.protobuf.Value can render multiple types
+            gen
+            ("m%s=types[%i].fromObject(d%s)", prop, fieldIndex, prop);
         } else {
             gen
-            // ("if(typeof d%s!==\"object\")", prop)
-            //     ("throw TypeError(%j)", field.fullName + ": object expected")
+            ("if(typeof d%s!==\"object\")", prop)
+                ("throw TypeError(%j)", field.fullName + ": object expected")
             ("m%s=types[%i].fromObject(d%s)", prop, fieldIndex, prop);
         }
     } else {
@@ -1550,14 +1554,16 @@ function genValuePartial_fromObject(gen, field, fieldIndex, prop) {
             case "sint64":
             case "fixed64":
             case "sfixed64": gen
-                ("if(util.Long)")
-                    ("(m%s=util.Long.fromValue(d%s)).unsigned=%j", prop, prop, isUnsigned)
-                ("else if(typeof d%s===\"string\")", prop)
-                    ("m%s=parseInt(d%s,10)", prop, prop)
-                ("else if(typeof d%s===\"number\")", prop)
-                    ("m%s=d%s", prop, prop)
-                ("else if(typeof d%s===\"object\")", prop)
-                    ("m%s=new util.LongBits(d%s.low>>>0,d%s.high>>>0).toNumber(%s)", prop, prop, prop, isUnsigned ? "true" : "");
+                ("if(d%s !== null && d%s !== undefined) {", prop, prop)
+                    ("if(util.Long)")
+                        ("(m%s=util.Long.fromValue(d%s)).unsigned=%j", prop, prop, isUnsigned)
+                    ("else if(typeof d%s===\"string\")", prop)
+                        ("m%s=parseInt(d%s,10)", prop, prop)
+                    ("else if(typeof d%s===\"number\")", prop)
+                        ("m%s=d%s", prop, prop)
+                    ("else if(typeof d%s===\"object\")", prop)
+                        ("m%s=new util.LongBits(d%s.low>>>0,d%s.high>>>0).toNumber(%s)", prop, prop, prop, isUnsigned ? "true" : "")
+                ("}");
                 break;
             case "bytes": gen
                 ("if(typeof d%s===\"string\")", prop)
@@ -1623,11 +1629,12 @@ converter.fromObject = function fromObject(mtype) {
 
         // Non-repeated fields
         } else {
-            if (!(field.resolvedType instanceof Enum)) gen // no need to test for null/undefined if an enum (uses switch)
-    // ("if(d%s!=null){", prop); // !== undefined && !== null
+            var needsGuard = !(field.resolvedType instanceof Enum || (field.resolvedType && field.resolvedType.fullName === '.google.protobuf.Value'));
+            if (needsGuard) gen // no need to test for null/undefined if an enum (uses switch)
+    ("if(d%s!=null){", prop); // !== undefined && !== null
     genValuePartial_fromObject(gen, field, /* not sorted */ i, prop);
-        // if (!(field.resolvedType instanceof Enum)) gen
-    // ("}");
+    if (needsGuard) gen
+    ("}");
         }
     } return gen
     ("return m");
@@ -8092,21 +8099,20 @@ wrappers[".google.protobuf.Struct"] = {
 
 wrappers[".google.protobuf.Timestamp"] = {
     
-    // given a protobuf Timestamp object, return a plain JS object
-    fromObject: function(object) {
-        return new Date(object.seconds*1000 + object.nanos/1000);
-    },
-
-    
     // given a plain javascript object, return a protobuf Timestamp object
-    toObject: function(message, options) {
-        var Timestamp = this.lookup("google.protobuf.Timestamp");
-        
-        return {
+    fromObject: function(object) {
 
-            seconds: Math.floor(message.valueOf()/1000),
-            nanos: (message.valueOf() % 1000) * 1000
-        };
+        return this.create({
+            seconds: Math.floor(object.valueOf()/1000),
+            nanos: (object.valueOf() % 1000) * 1000
+        })
+    },
+    
+    
+    // given a protobuf Timestamp object, return a plain JS object
+    toObject: function(message, options) {
+
+        return new Date(message.seconds*1000 + message.nanos/1000);
     }
 }
 
