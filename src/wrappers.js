@@ -179,7 +179,7 @@ wrappers[".google.protobuf.Timestamp"] = {
 
         return this.create({
             seconds: Math.floor(object.valueOf()/1000),
-            nanos: (object.valueOf() % 1000) * 1000
+            nanos: (object.valueOf() % 1000) * 1000000
         })
     },
     
@@ -187,6 +187,6 @@ wrappers[".google.protobuf.Timestamp"] = {
     // given a protobuf Timestamp object, return a plain JS object
     toObject: function(message, options) {
 
-        return new Date(message.seconds*1000 + message.nanos/1000);
+        return new Date(message.seconds*1000 + message.nanos/1000000);
     }
 }
