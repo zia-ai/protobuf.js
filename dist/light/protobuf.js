@@ -1,6 +1,6 @@
 /*!
- * protobuf.js v6.10.1 (c) 2016, daniel wirtz
- * compiled sat, 10 oct 2020 19:27:40 utc
+ * protobuf.js v6.10.2 (c) 2016, daniel wirtz
+ * compiled wed, 13 jan 2021 21:16:10 utc
  * licensed under the bsd-3-clause license
  * see: https://github.com/dcodeio/protobuf.js for details
  */
@@ -1120,15 +1120,22 @@ var Enum = require(14),
     util = require(33);
 
 /**
+ * Conversion options as used by {@link fromObject}.
+ * @interface IConverterOptions
+ * @property {boolean} [forceNumber] Enforces the use of `number` for s-/u-/int64 and s-/fixed64 fields.
+ */
+
+/**
  * Generates a partial value fromObject conveter.
  * @param {Codegen} gen Codegen instance
  * @param {Field} field Reflected field
  * @param {number} fieldIndex Field index
  * @param {string} prop Property reference
+ * @param {IConverterOptions} [options] Converter options
  * @returns {Codegen} Codegen instance
  * @ignore
  */
-function genValuePartial_fromObject(gen, field, fieldIndex, prop) {
+function genValuePartial_fromObject(gen, field, fieldIndex, prop, options) {
     /* eslint-disable no-unexpected-multiline, block-scoped-var, no-redeclare */
     if (field.resolvedType) {
         if (field.resolvedType instanceof Enum) { gen
@@ -1169,10 +1176,15 @@ function genValuePartial_fromObject(gen, field, fieldIndex, prop) {
             case "int64":
             case "sint64":
             case "fixed64":
-            case "sfixed64": gen
-                ("if(util.Long)")
+            case "sfixed64":
+                if (!options || !options.forceNumber) {
+                  gen
+                  ("if(util.Long)")
                     ("(m%s=util.Long.fromValue(d%s)).unsigned=%j", prop, prop, isUnsigned)
-                ("else if(typeof d%s===\"string\")", prop)
+                  ("else ");
+                }
+                gen
+                ("if(typeof d%s===\"string\")", prop)
                     ("m%s=parseInt(d%s,10)", prop, prop)
                 ("else if(typeof d%s===\"number\")", prop)
                     ("m%s=d%s", prop, prop)
@@ -1182,7 +1194,7 @@ function genValuePartial_fromObject(gen, field, fieldIndex, prop) {
             case "bytes": gen
                 ("if(typeof d%s===\"string\")", prop)
                     ("util.base64.decode(d%s,m%s=util.newBuffer(util.base64.length(d%s)),0)", prop, prop, prop)
-                ("else if(d%s.length)", prop)
+                ("else if(d%s.length >= 0)", prop)
                     ("m%s=d%s", prop, prop);
                 break;
             case "string": gen
@@ -1203,9 +1215,10 @@ function genValuePartial_fromObject(gen, field, fieldIndex, prop) {
 /**
  * Generates a plain object to runtime message converter specific to the specified message type.
  * @param {Type} mtype Message type
+ * @param {IConverterOptions} [options] Converter options
  * @returns {Codegen} Codegen instance
  */
-converter.fromObject = function fromObject(mtype) {
+converter.fromObject = function fromObject(mtype, options) {
     /* eslint-disable no-unexpected-multiline, block-scoped-var, no-redeclare */
     var fields = mtype.fieldsArray;
     var gen = util.codegen(["d"], mtype.name + "$fromObject")
@@ -1226,7 +1239,7 @@ converter.fromObject = function fromObject(mtype) {
             ("throw TypeError(%j)", field.fullName + ": object expected")
         ("m%s={}", prop)
         ("for(var ks=Object.keys(d%s),i=0;i<ks.length;++i){", prop);
-            genValuePartial_fromObject(gen, field, /* not sorted */ i, prop + "[ks[i]]")
+            genValuePartial_fromObject(gen, field, /* not sorted */ i, prop + "[ks[i]]", options)
         ("}")
     ("}");
 
@@ -1237,7 +1250,7 @@ converter.fromObject = function fromObject(mtype) {
             ("throw TypeError(%j)", field.fullName + ": array expected")
         ("m%s=[]", prop)
         ("for(var i=0;i<d%s.length;++i){", prop);
-            genValuePartial_fromObject(gen, field, /* not sorted */ i, prop + "[i]")
+            genValuePartial_fromObject(gen, field, /* not sorted */ i, prop + "[i]", options)
         ("}")
     ("}");
 
@@ -1245,7 +1258,7 @@ converter.fromObject = function fromObject(mtype) {
         } else {
             if (!(field.resolvedType instanceof Enum)) gen // no need to test for null/undefined if an enum (uses switch)
     ("if(d%s!=null){", prop); // !== undefined && !== null
-        genValuePartial_fromObject(gen, field, /* not sorted */ i, prop);
+        genValuePartial_fromObject(gen, field, /* not sorted */ i, prop, options);
             if (!(field.resolvedType instanceof Enum)) gen
     ("}");
         }
@@ -2626,8 +2639,9 @@ var util = require(33);
  * @param {boolean|Object.<string,*>} [responseStream] Whether the response is streamed
  * @param {Object.<string,*>} [options] Declared options
  * @param {string} [comment] The comment for this method
+ * @param {Object.<string,*>} [parsedOptions] Declared options, properly parsed into an object
  */
-function Method(name, type, requestType, responseType, requestStream, responseStream, options, comment) {
+function Method(name, type, requestType, responseType, requestStream, responseStream, options, comment, parsedOptions) {
 
     /* istanbul ignore next */
     if (util.isObject(requestStream)) {
@@ -2699,6 +2713,11 @@ function Method(name, type, requestType, responseType, requestStream, responseSt
      * @type {string|null}
      */
     this.comment = comment;
+
+    /**
+     * Options properly parsed into an object
+     */
+    this.parsedOptions = parsedOptions;
 }
 
 /**
@@ -2710,6 +2729,8 @@ function Method(name, type, requestType, responseType, requestStream, responseSt
  * @property {boolean} [requestStream=false] Whether requests are streamed
  * @property {boolean} [responseStream=false] Whether responses are streamed
  * @property {Object.<string,*>} [options] Method options
+ * @property {string} comment Method comments
+ * @property {Object.<string,*>} [parsedOptions] Method options properly parsed into an object
  */
 
 /**
@@ -2720,7 +2741,7 @@ function Method(name, type, requestType, responseType, requestStream, responseSt
  * @throws {TypeError} If arguments are invalid
  */
 Method.fromJSON = function fromJSON(name, json) {
-    return new Method(name, json.type, json.requestType, json.responseType, json.requestStream, json.responseStream, json.options, json.comment);
+    return new Method(name, json.type, json.requestType, json.responseType, json.requestStream, json.responseStream, json.options, json.comment, json.parsedOptions);
 };
 
 /**
@@ -2737,7 +2758,8 @@ Method.prototype.toJSON = function toJSON(toJSONOptions) {
         "responseType"   , this.responseType,
         "responseStream" , this.responseStream,
         "options"        , this.options,
-        "comment"        , keepComments ? this.comment : undefined
+        "comment"        , keepComments ? this.comment : undefined,
+        "parsedOptions"  , this.parsedOptions,
     ]);
 };
 

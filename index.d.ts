@@ -124,9 +124,10 @@ export namespace converter {
     /**
      * Generates a plain object to runtime message converter specific to the specified message type.
      * @param mtype Message type
+     * @param [options] Converter options
      * @returns Codegen instance
      */
-    function fromObject(mtype: Type): Codegen;
+    function fromObject(mtype: Type, options?: IConverterOptions): Codegen;
 
     /**
      * Generates a runtime message to plain object converter specific to the specified message type.
@@ -134,6 +135,13 @@ export namespace converter {
      * @returns Codegen instance
      */
     function toObject(mtype: Type): Codegen;
+}
+
+/** Conversion options as used by {@link fromObject}. */
+export interface IConverterOptions {
+
+    /** Enforces the use of `number` for s-/u-/int64 and s-/fixed64 fields. */
+    forceNumber?: boolean;
 }
 
 /**
@@ -602,8 +610,9 @@ export class Method extends ReflectionObject {
      * @param [responseStream] Whether the response is streamed
      * @param [options] Declared options
      * @param [comment] The comment for this method
+     * @param [parsedOptions] Declared options, properly parsed into an object
      */
-    constructor(name: string, type: (string|undefined), requestType: string, responseType: string, requestStream?: (boolean|{ [k: string]: any }), responseStream?: (boolean|{ [k: string]: any }), options?: { [k: string]: any }, comment?: string);
+    constructor(name: string, type: (string|undefined), requestType: string, responseType: string, requestStream?: (boolean|{ [k: string]: any }), responseStream?: (boolean|{ [k: string]: any }), options?: { [k: string]: any }, comment?: string, parsedOptions?: { [k: string]: any });
 
     /** Method type. */
     public type: string;
@@ -628,6 +637,9 @@ export class Method extends ReflectionObject {
 
     /** Comment for this method */
     public comment: (string|null);
+
+    /** Options properly parsed into an object */
+    public parsedOptions: any;
 
     /**
      * Constructs a method from a method descriptor.
@@ -666,6 +678,12 @@ export interface IMethod {
 
     /** Method options */
     options?: { [k: string]: any };
+
+    /** Method comments */
+    comment: string;
+
+    /** Method options properly parsed into an object */
+    parsedOptions?: { [k: string]: any };
 }
 
 /** Reflected namespace. */
